@@ -282,15 +282,28 @@
         return n === null ? "–" : n + "°";
       }
 
+      // API times use the location's local clock with no offset, so build the
+      // Date from its parts to keep the displayed wall-clock time unchanged.
+      function parseLocal(iso) {
+        var match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(iso || "");
+        if (!match) { return null; }
+        return new Date(+match[1], +match[2] - 1, +match[3], +(match[4] || 0), +(match[5] || 0));
+      }
+
       function formatHour(iso) {
-        var date = new Date(iso);
-        return isNaN(date) ? "" : date.toLocaleTimeString([], { hour: "numeric" });
+        var date = parseLocal(iso);
+        return date ? date.toLocaleTimeString([], { hour: "numeric" }) : "";
       }
 
       function formatDay(iso, index) {
         if (index === 0) { return "Today"; }
-        var date = new Date(iso);
-        return isNaN(date) ? "" : date.toLocaleDateString([], { weekday: "short" });
+        var date = parseLocal(iso);
+        return date ? date.toLocaleDateString([], { weekday: "short" }) : "";
+      }
+
+      function formatUpdated(iso) {
+        var date = parseLocal(iso);
+        return date ? "Updated " + date.toLocaleString([], { hour: "numeric", minute: "2-digit" }) : "";
       }
 
       function fetchJson(url) {
@@ -335,8 +348,7 @@
         var currentInfo = describe(current.weather_code);
 
         el("place").textContent = place.name;
-        el("observed").textContent = current.time ?
-          "Updated " + new Date(current.time).toLocaleString([], { hour: "numeric", minute: "2-digit" }) : "";
+        el("observed").textContent = formatUpdated(current.time);
         el("temp").textContent = formatTemp(current.temperature_2m);
         el("summary").textContent = currentInfo[0];
         el("current-icon").textContent = currentInfo[1];
@@ -358,9 +370,10 @@
         container.textContent = "";
 
         var now = Date.now();
-        var start = 0;
+        var start = times.length ? times.length - 1 : 0;
         for (var i = 0; i < times.length; i++) {
-          if (new Date(times[i]).getTime() >= now - 3600000) { start = i; break; }
+          var slot = parseLocal(times[i]);
+          if (slot && slot.getTime() >= now - 3600000) { start = i; break; }
         }
 
         for (var j = start; j < Math.min(start + 24, times.length); j++) {
